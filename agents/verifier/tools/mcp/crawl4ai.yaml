@@ -1,0 +1,14 @@
+name: crawl4ai
+transport: http
+# Plain ${CRAWL4AI_URL} (no :-default): omnigent expands tools/mcp/*.yaml
+# server-side for host-discovered/template launches with os.path.expandvars,
+# which does NOT implement the shell ${VAR:-default} form and then hard-fails on
+# the unresolved ${...}. Keep the localhost default in .env.example / the runner
+# env instead. (The omni-CLI upload path expands ${VAR} client-side; both work.)
+url: ${CRAWL4AI_URL}
+# crawl4ai 0.9.0 auth. ${CRAWL4AI_API_TOKEN} is expanded CLIENT-SIDE at upload by
+# the `omni` CLI against the operator env — uploaded session-scoped
+# bundles are never expanded server-side (anti-exfiltration; see AGENTSPEC.md
+# "${VAR} is NOT expanded for uploaded bundles"). No secret is committed here.
+headers:
+  Authorization: "Bearer ${CRAWL4AI_API_TOKEN}"

@@ -1,0 +1,43 @@
+# dossier/sources/register.yaml — every claim anywhere in the dossier cites a source
+# id from this register. Mint id via `omnigent/bin/mint-id.sh src` — never
+# hand-number.
+#
+# Fields:
+#   id                    src-<ULID>, minted via `mint-id.sh src`
+#   title                 short descriptive title of the source
+#   type                  primary_document | primary_register | primary_official |
+#                         primary_selfpublished | secondary_aggregator | press |
+#                         court | web
+#   origin                publisher / register / organisation name
+#   url                   the live URL, or null if offline-only (e.g. a local document)
+#   archive_url           a Wayback Machine save URL, OR a local archived snapshot
+#                         path (evidence/snapshots/...) — archive a source BEFORE
+#                         relying on it, never after
+#   retrieved             YYYY-MM-DD
+#   sha256                sha256 hash of the archived artefact (screenshot, snapshot,
+#                         or document)
+#   sift_verdict          one or two sentences: what kind of source this is, what it
+#                         authoritatively establishes, and its limits (paywalled
+#                         fields, self-published, single-source, etc)
+#
+# Optional (when a source is captured as a screenshot rather than a text snapshot):
+#   screenshot            path to the screenshot file
+#   screenshot_retrieved  YYYY-MM-DD
+#
+# Example (synthetic, commented out):
+#
+# - id: src-01ARZ3NDEKTSV4RRFFQ69G5FAW
+#   title: "Companies Register — current details for Example Trading Ltd"
+#   type: primary_register
+#   origin: "Example National Companies Register"
+#   url: "https://register.example.gov/company/00000001"
+#   archive_url: "evidence/snapshots/src-01ARZ3NDEKTSV4RRFFQ69G5FAW_2026-01-01.md"
+#   retrieved: 2026-01-01
+#   sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+#   sift_verdict: >-
+#     Official government register. Authoritative for incorporation number, entity
+#     name, and status. Director details are on this extract; beneficial ownership
+#     is not disclosed on the free view.
+#
+# This file starts empty. Every new source is minted and appended by the
+# researcher/verifier during a run — never hand-append with a guessed id.

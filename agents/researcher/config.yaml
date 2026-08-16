@@ -1,0 +1,99 @@
+spec_version: 1
+name: researcher
+description: OSINT researcher — collects raw, sourced material on one lead using SearXNG + crawl4ai; snapshots evidence; reports back. Edits no dossier files.
+
+executor:
+  type: omnigent
+  config:
+    # First-class in-process harness (not claude-native). The wrapped native-UI
+    # harnesses deliver sub-agent completions to the coordinator's inbox
+    # second-class — they can complete the work but never wake the parent, which
+    # deadlocked INV-SYNTH-01 (upstream omnigent-ai/omnigent#848). claude-sdk
+    # routes completion through the runner's own turn-end path, so the result is
+    # delivered reliably. Same vendor (Claude); only the mechanism changes.
+    harness: claude-sdk
+    permission_mode: bypassPermissions
+
+os_env:
+  type: caller_process
+  cwd: .
+  sandbox:
+    type: none
+
+prompt: |
+  You are an OSINT researcher dispatched for ONE lead (an entity + a question).
+  Collect raw material — do not grade it, do not edit any dossier files.
+
+  This runs UNATTENDED — there is no human at your console to answer questions.
+  NEVER call the `AskUserQuestion` tool (or any ask-the-human / elicitation tool):
+  it stalls the whole run awaiting an answer that will not come. When you face a
+  choice or are uncertain, make the most conservative reasonable decision yourself
+  and note the assumption in your output for later human review.
+
+  Work efficiently — a single turn that runs too long without emitting any progress trips
+  the harness idle watchdog and the ENTIRE dispatch is thrown away and retried, wasting
+  work. So:
+  - If a `sys_os_read` or a fetch reports the result is oversized ("exceeds maximum
+    allowed tokens"), do NOT re-read the whole blob — use `offset`/`limit`, or
+    `grep`/`head`/`sed` to pull only the lines you need. Never load a >~20k-character
+    page or file into context in one read.
+  - Put any scratch files under the WORKSPACE (e.g. `evidence/snapshots/`, or a
+    `scratch/` dir inside the workspace) — NEVER `/tmp`: it is outside the environment
+    root, so every read/write there is blocked and wastes a call.
+  - Keep the tool chain bounded: capture what you need, then report. Do not run dozens
+    of exploratory calls in one turn — batch/consolidate and stop once you have enough.
+
+  Procedure:
+  1. Use `searxng_web_search` to discover candidate sources (registries, official
+     sites, press, court records). Prefer primary/authoritative sources.
+  2. Use the crawl4ai tools (`md`, `crawl`, `screenshot`) to fetch each source you
+     rely on, and SNAPSHOT it into `evidence/snapshots/` (markdown; screenshot for
+     pages where layout matters). You MAY write under `evidence/snapshots/` only.
+     These are MCP tools — invoke them as function/tool calls named `crawl4ai__md`,
+     `crawl4ai__crawl`, `crawl4ai__screenshot`. They are NOT shell commands: running
+     `mcp__crawl4ai__md url=...` (or any `mcp__...`) in `sys_os_shell` always fails
+     with command-not-found. If a tool call genuinely is not available, fall back to
+     `curl`/`gh` against the source URL — never shell out to an MCP tool name.
+  3. Use `gh` / shell for GitHub or direct registry URLs when relevant.
+  4. If a fetch is blocked/empty/CAPTCHA/Cloudflare/truncated, capture a stealth PNG snapshot:
+     `omnigent/bin/capture-evidence.sh --stealth <url> evidence/snapshots/<name>.png` — the only
+     sanctioned stealth path (crawl4ai rejects caller cdp_url). Use only as a fallback; note stealth fetches.
+
+  Return a structured report: for each claim, give the claim, the source URL, the
+  retrieval date, the snapshot path, and whether the source is primary or
+  secondary. Note what you could NOT find. Do not assert conclusions beyond the
+  evidence; that is the verifier's job.
+
+tools:
+  searxng:
+    type: mcp
+    command: npx
+    # --prefer-online: the runner's npm packument can be stale and ETARGET on the
+    # latest dist-tag (e.g. mcp-searxng@1.6.0); force fresh metadata each launch.
+    args: ["-y", "--prefer-online", "mcp-searxng"]
+    env:
+      # SEARXNG_URL is intentionally NOT set here. omnigent spawns a stdio MCP with
+      # env = os.environ | config.env, and config values WIN on conflict — so a literal
+      # SEARXNG_URL here would silently override the deployment's runner-env value.
+      # Instead the subprocess inherits SEARXNG_URL from the runner environment:
+      #   - deployment: set SEARXNG_URL in the runner env and name it in
+      #     OMNIGENT_RUNNER_ENV_PASSTHROUGH (point it at your searxng endpoint);
+      #   - generic local users: `export SEARXNG_URL=http://localhost:8080` before launch.
+      # ${VAR:-default} is NOT usable (os.path.expandvars ignores the :- form and the
+      # parser then rejects the unresolved ${...}); plain ${SEARXNG_URL} would hard-fail
+      # when unset. Keeping this benign key makes env: non-empty so the FULL runner env
+      # is inherited — an empty env: falls back to a 6-var SDK allowlist that drops SEARXNG_URL.
+      MCP_SEARXNG_CLIENT: omnigent
+  # crawl4ai (HTTP/SSE) lives in tools/mcp/crawl4ai.yaml so `omni` expands its
+  # ${CRAWL4AI_API_TOKEN} header client-side at upload (uploaded bundles aren't
+  # expanded server-side). searxng stays inline — its config carries no secret.
+
+guardrails:
+  policies:
+    blast_radius:
+      type: function
+      on: [tool_call]
+      function:
+        path: omnigent.inner.nessie.policies.blast_radius
+        arguments:
+          gate_pushes: false

@@ -1,0 +1,58 @@
+<!--
+Copy this file to `dossier/case-brief.md` (repo root, private — case data never
+lives under `omnigent/`) and replace every placeholder below with your own case's
+real identity. The coordinator prompt reads `dossier/case-brief.md` at the start of
+every run to learn what case it is working; without it, the coordinator has no case
+to investigate.
+-->
+
+# Case Brief — <Case Name>
+
+## Authorisation & scope
+
+State who authorised this investigation, in what capacity (e.g. private
+investigation client, investigative-journalism outlet), and any explicit
+boundaries: in-scope jurisdictions, what is out of bounds, PII-handling rules, and
+OPSEC constraints (e.g. passive collection only — never contact or tip off
+subjects).
+
+*Example: "Authorised private investigation on behalf of [client], investigative-
+journalism scope. In-scope jurisdictions: GB, US, NL. Passive collection only —
+never contact subjects. No publication of unredacted minors' data."*
+
+## Subject
+
+One or two sentences: what is this investigation about, and what conduct or
+question is being investigated?
+
+*Example: "Investigation into the supply chain and corporate structure behind a
+consumer product marketed under the ExampleBrand name."*
+
+## Target entities
+
+The starting set of companies/individuals known at case open — the seed the first
+runs' leads will expand from.
+
+*Example:*
+
+| Entity | Jurisdiction | Role |
+|---|---|---|
+| Example Trading Ltd | GB | Principal trading entity |
+| Example Holdings B.V. | NL | European operating arm |
+| Jane Example | GB | Director, both entities (alleged) |
+
+## Known affiliates / brands
+
+Consumer brands, trading names, or affiliated entities already known to be part of
+the same network at case open.
+
+*Example: "ExampleBrand — the consumer-facing trading name used across the GB and
+NL entities."*
+
+## Open questions at case open
+
+The starting questions the first leads should chase.
+
+*Example:*
+- Beneficial ownership of Example Holdings B.V. beyond the disclosed director.
+- Whether Example Trading Ltd and Example Holdings B.V. share common control.

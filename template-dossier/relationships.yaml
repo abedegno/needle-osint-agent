@@ -1,0 +1,32 @@
+# dossier/relationships.yaml — the edges connecting entities/people (the web). Every
+# edge is a claim like any other: it carries its own confidence grade and its own
+# sources, and it is never asserted beyond what those sources actually show.
+#
+# Fields:
+#   from          entity-or-person slug id (see entities/README.md, people/README.md)
+#   to            entity-or-person slug id
+#   type          the relationship type, e.g.:
+#                   owns | subsidiary_of | director_of | former_director_of |
+#                   shared_address | shared_phone | shared_email | shared_branding |
+#                   shared_domain | shared_agent | agent_for | owner_of |
+#                   employee_of | registered_agent_of | counsel_for |
+#                   attorney_of_record_for | dispute_with | exports_to |
+#                   manufactures_for
+#                 Extend this vocabulary as your case needs; keep it consistent once
+#                 you pick a term for a given kind of edge.
+#   confidence    A | B | C | D — see the confidence scale in README.md
+#   note          why this edge exists, cited inline with [src-<ULID>]; be explicit
+#                 about what the edge does NOT establish (e.g. a shared registered
+#                 agent is a coordination signal, not proof of common control)
+#   sources       [src-<ULID>, ...]
+#
+# Example (synthetic, commented out):
+#
+# - from: example-trading-ltd
+#   to: example-holdings-bv
+#   type: shared_agent
+#   confidence: B
+#   note: "Both companies list the same registered agent, 'Acme Corporate Services', on their respective national registers [src-01ARZ3NDEKTSV4RRFFQ69G5FAW]. A shared agent is a coordination signal, not proof of common ownership or control."
+#   sources: [src-01ARZ3NDEKTSV4RRFFQ69G5FAW]
+#
+# This file starts empty. Append edges as corroboration surfaces them.

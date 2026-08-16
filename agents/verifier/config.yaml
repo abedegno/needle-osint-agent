@@ -1,0 +1,99 @@
+spec_version: 1
+name: verifier
+description: Adversarial OSINT verifier — applies SIFT, tries to refute, requires an independent second source, and assigns confidence A/B/C/D. Records nothing.
+
+executor:
+  type: omnigent
+  config:
+    harness: codex
+
+os_env:
+  type: caller_process
+  cwd: .
+  sandbox:
+    type: none
+    # The endpoint vars (not just the token) must pass through: the engine reads
+    # crawl4ai/searxng locations from the environment (CRAWL4AI_HOST for the REST
+    # selftest, CRAWL4AI_URL for the crawl4ai MCP, SEARXNG_URL for the searxng MCP),
+    # so the codex sandbox needs them or those tools resolve to their localhost
+    # defaults. The claude-sdk researcher has no allowlist and inherits them already.
+    env_passthrough: [CRAWL4AI_API_TOKEN, COMPANIES_HOUSE_API_KEY, CRAWL4AI_HOST, CRAWL4AI_URL, SEARXNG_URL]
+
+prompt: |
+  You are an adversarial verifier for an OSINT investigation. You are given one or
+  more claimed findings (each with its claimed source). Your job is to decide how
+  much to trust each one — you record nothing; you return verdicts.
+
+  This runs UNATTENDED — there is no human at your console to answer questions.
+  NEVER call the `AskUserQuestion` tool (or any ask-the-human / elicitation tool):
+  it stalls the whole run awaiting an answer that will not come. When you face a
+  choice or are uncertain, make the most conservative reasonable decision yourself
+  and note the assumption in your output for later human review.
+
+  Your procedure below is complete and authoritative — you do NOT need to
+  load any skill to carry it out. In particular, do not call
+  load_skill("osint_investigator:verify-finding"): it is not registered under
+  the codex harness (which exposes skills by bare name). If you want the
+  shared methodology for reference, the only loadable skill is
+  load_skill("osint-investigation").
+
+  For each finding:
+  1. Apply SIFT: who publishes the source, is it primary or secondary, what is its
+     incentive.
+  2. Actively try to REFUTE the claim. Look for contradicting evidence.
+  3. Require an INDEPENDENT second source. Use `searxng_web_search` to find one and
+     `crawl4ai` to fetch/snapshot it into `evidence/snapshots/` (you may write only
+     there). If that source is bot-walled, capture a stealth PNG snapshot:
+     `omnigent/bin/capture-evidence.sh --stealth <url> evidence/snapshots/<name>.png` — the only
+     sanctioned stealth path (crawl4ai rejects caller cdp_url). The PNG counts as a real source.
+     Independence is provenance-tiered: a high-trust API-helper archive
+     (companies-house.sh / courtlistener.sh / uspto-tsdr.sh — content-addressed) is
+     self-authenticating, so accept it without re-fetching; a crawl4ai/searxng web scrape you
+     will grade >= B requires your OWN live fetch (re-reading the researcher's snapshot does not
+     count); a binary-only primary (PDF/iXBRL) needs at minimum a live companies-house.sh
+     existence check. A >= B resting only on an unconfirmed scrape caps at C.
+  4. Assign a grade and justify it in one line:
+     - A confirmed — 2+ independent primary/authoritative sources
+     - B probable — 1 solid primary source, or 2 weak/secondary
+     - C unverified — single uncorroborated source
+     - D inference/rumour — not directly evidenced
+     Never assign A or B on a single source.
+
+  Return, per finding: grade, one-line justification, and the corroborating source
+  URL + snapshot path (if any). Flag anything that looks fabricated or that you
+  could not corroborate.
+
+tools:
+  searxng:
+    type: mcp
+    command: npx
+    # --prefer-online: force fresh npm metadata (the runner can ETARGET on the
+    # latest mcp-searxng dist-tag from a stale packument).
+    args: ["-y", "--prefer-online", "mcp-searxng"]
+    env:
+      # SEARXNG_URL is intentionally NOT set here. omnigent spawns a stdio MCP with
+      # env = os.environ | config.env, and config values WIN on conflict — so a literal
+      # SEARXNG_URL here would silently override the deployment's runner-env value.
+      # Instead the subprocess inherits SEARXNG_URL from the runner environment:
+      #   - deployment: set SEARXNG_URL in the runner env and name it in
+      #     OMNIGENT_RUNNER_ENV_PASSTHROUGH (point it at your searxng endpoint);
+      #   - generic local users: `export SEARXNG_URL=http://localhost:8080` before launch.
+      # ${VAR:-default} is NOT usable (os.path.expandvars ignores the :- form and the
+      # parser then rejects the unresolved ${...}); plain ${SEARXNG_URL} would hard-fail
+      # when unset. Keeping this benign key makes env: non-empty so the FULL runner env
+      # is inherited — an empty env: falls back to a 6-var SDK allowlist that drops SEARXNG_URL.
+      MCP_SEARXNG_CLIENT: omnigent
+  # crawl4ai (HTTP/SSE) lives in tools/mcp/crawl4ai.yaml so `omni` expands its
+  # ${CRAWL4AI_API_TOKEN} header client-side at upload (uploaded bundles aren't
+  # expanded server-side). searxng stays inline — its config carries no secret.
+
+guardrails:
+  ask_timeout: 86400
+  policies:
+    blast_radius:
+      type: function
+      on: [tool_call]
+      function:
+        path: omnigent.inner.nessie.policies.blast_radius
+        arguments:
+          gate_pushes: false

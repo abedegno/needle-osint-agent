@@ -1,0 +1,19 @@
+{
+  "mcpServers": {
+    "crawl4ai": {
+      "type": "sse",
+      "url": "http://localhost:11235/mcp/sse",
+      "headers": {
+        "Authorization": "Bearer ${CRAWL4AI_API_TOKEN}"
+      }
+    },
+    "searxng": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "--prefer-online", "mcp-searxng"],
+      "env": {
+        "SEARXNG_URL": "http://localhost:8080"
+      }
+    }
+  }
+}
